@@ -6,7 +6,7 @@ COPY src ./src
 RUN mvn clean package -DskipTests
 
 # 運行階段 - 使用 IBM Semeru (OpenJ9) 替代 HotSpot 以大幅降低記憶體佔用
-FROM ibm-semeru-runtimes:open-21-jre-alpine
+FROM ibm-semeru-runtimes:open-21-jre-jammy
 WORKDIR /app
 
 # OpenJ9 專屬記憶體壓縮參數
@@ -26,10 +26,10 @@ ENV LC_ALL=en_US.UTF-8
 # 減少 glibc 記憶體碎片，極限壓縮到 1 個 arena
 ENV MALLOC_ARENA_MAX=1
 
-RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories \
-    && apk update \
-    && apk upgrade \
-    && apk add --no-cache fontconfig ttf-dejavu
+# 安裝字體依賴 (Ubuntu/Debian 套件管理器)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    fontconfig fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app/target/*.jar app.jar
 EXPOSE 6365
