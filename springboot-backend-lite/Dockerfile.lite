@@ -1,0 +1,36 @@
+# 構建階段 - 使用與原 Dockerfile 相同的 Maven 編譯映像
+FROM maven:3.9.6-eclipse-temurin-21 AS build
+WORKDIR /app
+COPY pom.xml .
+COPY src ./src
+RUN mvn clean package -DskipTests
+
+# 運行階段 - 使用 IBM Semeru (OpenJ9) 極限壓縮
+FROM ibm-semeru-runtimes:open-21-jre-jammy
+WORKDIR /app
+
+# 建立 SQLite 資料目錄
+RUN mkdir -p /app/data
+
+# OpenJ9 專屬記憶體壓縮參數
+ENV JAVA_OPTS="-Xmx128m -Xms64m -Xmso256k -Xscmx64m -Xshareclasses -Xtune:virtualized -Xjit:optlevel=cold -Xgcpolicy:gencon -XX:MaxDirectMemorySize=32m -Dfile.encoding=UTF-8 -Duser.timezone=Asia/Shanghai"
+ENV LANG=en_US.UTF-8
+ENV LANGUAGE=en_US:en
+ENV LC_ALL=en_US.UTF-8
+ENV MALLOC_ARENA_MAX=1
+
+# 安裝字體依賴
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    fontconfig fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /app/target/*.jar app.jar
+
+# SQLite 資料持久化目錄
+VOLUME ["/app/data"]
+EXPOSE 6365
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
+    CMD curl -f http://localhost:6365/flow/test || exit 1
+
+ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar /app/app.jar"]

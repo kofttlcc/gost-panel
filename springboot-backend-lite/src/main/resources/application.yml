@@ -1,0 +1,53 @@
+spring:
+  datasource:
+    driver-class-name: org.sqlite.JDBC
+    url: jdbc:sqlite:/app/data/gost.db
+    hikari:
+      max-lifetime: 500000
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-pool-size: 1
+      minimum-idle: 1
+      pool-name: HikariCP
+      auto-commit: true
+      connection-test-query: SELECT 1
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+server:
+  port: 6365
+  undertow:
+    threads:
+      worker: 20
+      io: 2
+    buffer-size: 1024
+    direct-buffers: true
+  shutdown: graceful
+  error:
+    whitelabel:
+      enabled: false
+    include-message: always
+    include-binding-errors: always
+
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**Mapper.xml
+  global-config:
+    db-config:
+      id-type: auto
+  configuration:
+    map-underscore-to-camel-case: true
+#    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+jwt-secret: ${JWT_SECRET}
+log-dir: ${LOG_DIR}
+
+
+captcha:
+  init-default-resource: true
+  secondary:
+    enabled: true
+    expire: 120000

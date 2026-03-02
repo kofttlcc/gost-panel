@@ -65,6 +65,33 @@ services:
     networks:
       - gost-network
 
+  # SQLite 輕量版 - 不需要 MySQL，極限省記憶體
+  backend-lite:
+    image: koftt/springboot-backend:lite
+    container_name: springboot-backend-lite
+    restart: unless-stopped
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      LOG_DIR: /app/logs
+      MALLOC_ARENA_MAX: "1"
+    ports:
+      - "6367:6365"
+    volumes:
+      - backend_lite_data:/app/data
+      - backend_lite_logs:/app/logs
+    networks:
+      - gost-network
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget --no-verbose --tries=1 --spider http://localhost:6365/flow/test || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+    deploy:
+      resources:
+        limits:
+          memory: 150m
+
 
 volumes:
   backend_logs:
@@ -72,6 +99,12 @@ volumes:
     driver: local
   backend_j9_logs:
     name: backend_j9_logs
+    driver: local
+  backend_lite_data:
+    name: backend_lite_data
+    driver: local
+  backend_lite_logs:
+    name: backend_lite_logs
     driver: local
 
 

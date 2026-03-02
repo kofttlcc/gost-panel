@@ -1,0 +1,37 @@
+# 構建階段 - 使用與原 Dockerfile 相同的 Maven 編譯映像
+FROM maven:3.9.6-eclipse-temurin-21 AS build
+WORKDIR /app
+COPY pom.xml .
+COPY src ./src
+RUN mvn clean package -DskipTests
+
+# 運行階段 - 使用 IBM Semeru (OpenJ9) 替代 HotSpot 以大幅降低記憶體佔用
+FROM ibm-semeru-runtimes:open-21-jre-jammy
+WORKDIR /app
+
+# OpenJ9 專屬記憶體壓縮參數
+# -Xmx128m: 最大堆記憶體
+# -Xms64m: 初始堆記憶體
+# -Xmso256k: 執行緒棧大小 (對應 HotSpot 的 -Xss)
+# -Xscmx64m: 共享類快取最大值
+# -Xshareclasses: 啟用共享類快取，加速啟動並減少記憶體
+# -Xtune:virtualized: 針對容器/虛擬化環境調優，主動歸還閒置記憶體
+# -Xjit:optlevel=cold: 降低 JIT 編譯等級，減少編譯器記憶體消耗
+# -Xgcpolicy:gencon: 使用世代併發 GC，適合低記憶體場景
+# -XX:MaxDirectMemorySize=32m: 限制直接記憶體
+ENV JAVA_OPTS="-Xmx128m -Xms64m -Xmso256k -Xscmx64m -Xshareclasses -Xtune:virtualized -Xjit:optlevel=cold -Xgcpolicy:gencon -XX:MaxDirectMemorySize=32m -Dfile.encoding=UTF-8 -Duser.timezone=Asia/Shanghai"
+ENV LANG=en_US.UTF-8
+ENV LANGUAGE=en_US:en
+ENV LC_ALL=en_US.UTF-8
+# 減少 glibc 記憶體碎片，極限壓縮到 1 個 arena
+ENV MALLOC_ARENA_MAX=1
+
+# 安裝字體依賴 (Ubuntu/Debian 套件管理器)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    fontconfig fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /app/target/*.jar app.jar
+EXPOSE 6365
+
+ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar /app/app.jar"]
