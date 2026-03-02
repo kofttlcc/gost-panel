@@ -219,9 +219,54 @@ jobs:
             -t koftt/springboot-backend:${VERSION} \
             ./springboot-backend
 
+  build-java-j9:
+    name: Build & Push Spring Boot Backend (OpenJ9)
+    needs: check-version
+    if: needs.check-version.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up JDK and Maven
+        uses: actions/setup-java@v3
+        with:
+          java-version: 21
+          distribution: 'temurin'
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+
+      - name: Build Java JAR
+        working-directory: ./springboot-backend
+        run: mvn clean package -DskipTests
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+      - name: Build and push OpenJ9 Docker images
+        run: |
+          VERSION="${{ needs.check-version.outputs.version }}"
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --push \
+            -f ./springboot-backend/Dockerfile.j9 \
+            -t koftt/springboot-backend:j9 \
+            -t koftt/springboot-backend:${VERSION}-j9 \
+            ./springboot-backend
+
   create-release:
     name: Create Release and Tag
-    needs: [check-version, build-gost, build-vite, build-java]
+    needs: [check-version, build-gost, build-vite, build-java, build-java-j9]
     if: needs.check-version.outputs.should_build == 'true'
     runs-on: ubuntu-latest
     permissions:

@@ -8,8 +8,8 @@ spring:
       max-lifetime: 500000
       connection-timeout: 30000
       idle-timeout: 600000
-      max-pool-size: 20
-      minimum-idle: 5
+      max-pool-size: 10
+      minimum-idle: 2
       pool-name: HikariCP
       auto-commit: true
       connection-test-query: SELECT 1
@@ -22,11 +22,12 @@ spring:
 
 server:
   port: 6365
-  tomcat:
-    uri-encoding: UTF-8
+  undertow:
     threads:
-      max: 50
-    max-connections: 500
+      worker: 20
+      io: 2
+    buffer-size: 1024
+    direct-buffers: true
   shutdown: graceful
   error:
     whitelabel:

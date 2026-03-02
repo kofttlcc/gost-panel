@@ -23,6 +23,36 @@ services:
       retries: 5
       start_period: 90s
 
+  # OpenJ9 + Undertow 極限記憶體壓縮測試容器
+  backend-j9:
+    image: koftt/springboot-backend:j9
+    container_name: springboot-backend-j9
+    restart: unless-stopped
+    environment:
+      DB_HOST: ${DB_HOST:-172.17.0.1}
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      LOG_DIR: /app/logs
+      MALLOC_ARENA_MAX: "1"
+    ports:
+      - "6366:6365"
+    volumes:
+      - backend_j9_logs:/app/logs
+    networks:
+      - gost-network
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget --no-verbose --tries=1 --spider http://localhost:6365/flow/test || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+    deploy:
+      resources:
+        limits:
+          memory: 200m
+
   frontend:
     image: koftt/vite-frontend:latest
     container_name: vite-frontend
@@ -39,6 +69,9 @@ services:
 volumes:
   backend_logs:
     name: backend_logs
+    driver: local
+  backend_j9_logs:
+    name: backend_j9_logs
     driver: local
 
 
