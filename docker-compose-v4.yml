@@ -25,9 +25,7 @@ services:
 
   # OpenJ9 + Undertow 極限記憶體壓縮測試容器
   backend-j9:
-    build:
-      context: ./springboot-backend
-      dockerfile: Dockerfile.j9
+    image: koftt/springboot-backend:j9
     container_name: springboot-backend-j9
     restart: unless-stopped
     environment:
