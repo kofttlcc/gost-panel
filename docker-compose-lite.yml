@@ -1,0 +1,59 @@
+# SQLite 輕量版 Docker Compose
+# 無需 MySQL，後端 + 前端僅需約 100MB 記憶體
+# 用法：docker compose -f docker-compose-lite.yml up -d
+#
+# ⚠️ 首次使用前：
+#   1. 確保 /opt/gost-panel/data/gost.db 已存在（用遷移腳本產生）
+#   2. 修改 .env 中的 JWT_SECRET
+
+services:
+  backend:
+    image: koftt/springboot-backend:lite
+    container_name: springboot-backend
+    restart: unless-stopped
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      LOG_DIR: /app/logs
+      MALLOC_ARENA_MAX: "1"
+    ports:
+      - "${BACKEND_PORT:-6365}:6365"
+    volumes:
+      - ${SQLITE_DATA_DIR:-/opt/gost-panel/data}:/app/data    # SQLite 資料庫持久化
+      - backend_logs:/app/logs
+    networks:
+      - gost-network
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget --no-verbose --tries=1 --spider http://localhost:6365/flow/test || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+    deploy:
+      resources:
+        limits:
+          memory: 150m
+
+  frontend:
+    image: koftt/vite-frontend:latest
+    container_name: vite-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - gost-network
+
+volumes:
+  backend_logs:
+    name: backend_logs
+    driver: local
+
+networks:
+  gost-network:
+    name: gost-network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
