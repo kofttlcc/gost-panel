@@ -6,7 +6,7 @@
 # ============================================================
 
 # ========== 配置區（請根據實際環境修改）==========
-MYSQL_HOST="${DB_HOST:-172.17.0.1}"
+MYSQL_CONTAINER="${MYSQL_CONTAINER:-1Panel-mysql-ikoc}"  # MySQL Docker 容器名稱
 MYSQL_USER="${DB_USER:-root}"
 MYSQL_PASS="${DB_PASSWORD:-}"
 MYSQL_DB="${DB_NAME:-gost}"
@@ -16,8 +16,9 @@ SQLITE_DB="${1:-/tmp/gost.db}"
 TABLES="node tunnel forward user user_tunnel speed_limit statistics_flow vite_config"
 
 # 檢查必要工具
-command -v mysqldump >/dev/null 2>&1 || { echo "錯誤: 需要安裝 mysqldump"; echo "  apt-get install -y default-mysql-client"; exit 1; }
+command -v docker >/dev/null 2>&1 || { echo "錯誤: 需要安裝 docker"; exit 1; }
 command -v sqlite3 >/dev/null 2>&1 || { echo "錯誤: 需要安裝 sqlite3"; echo "  apt-get install -y sqlite3"; exit 1; }
+docker ps --format '{{.Names}}' | grep -q "^${MYSQL_CONTAINER}$" || { echo "錯誤: MySQL 容器 '${MYSQL_CONTAINER}' 未運行"; echo "  請先啟動容器或修改 MYSQL_CONTAINER 變數"; exit 1; }
 
 # 如果已存在舊的 SQLite 檔案，備份它
 if [ -f "$SQLITE_DB" ]; then
@@ -30,7 +31,7 @@ fi
 echo "=========================================="
 echo "  MySQL → SQLite 資料遷移工具"
 echo "=========================================="
-echo "MySQL: ${MYSQL_USER}@${MYSQL_HOST}/${MYSQL_DB}"
+echo "MySQL: docker exec ${MYSQL_CONTAINER} → ${MYSQL_USER}@${MYSQL_DB}"
 echo "SQLite: ${SQLITE_DB}"
 echo ""
 
@@ -161,8 +162,8 @@ FAIL=0
 for TABLE in $TABLES; do
     printf "  遷移 %-20s ... " "$TABLE"
 
-    # 從 MySQL 匯出為相容格式
-    DUMP=$(mysqldump -h "$MYSQL_HOST" -u "$MYSQL_USER" -p"$MYSQL_PASS" \
+    # 使用 docker exec 在 MySQL 容器內執行 mysqldump
+    DUMP=$(docker exec "$MYSQL_CONTAINER" mysqldump -u"$MYSQL_USER" -p"$MYSQL_PASS" \
         --no-create-info --compact --compatible=ansi \
         --skip-extended-insert --complete-insert \
         "$MYSQL_DB" "$TABLE" 2>/dev/null)
