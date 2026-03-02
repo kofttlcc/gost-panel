@@ -5,13 +5,24 @@
 # 用法：bash migrate_mysql_to_sqlite.sh
 # ============================================================
 
-# ========== 配置區（請根據實際環境修改）==========
-MYSQL_CONTAINER="${MYSQL_CONTAINER:-1Panel-mysql-ikoc}"  # MySQL Docker 容器名稱
-MYSQL_USER="${DB_USER:-root}"
-MYSQL_PASS="${DB_PASSWORD:-}"
-MYSQL_DB="${DB_NAME:-gost}"
+# ========== 配置區（在下方直接填寫真實資訊）==========
+
+# ✅ 直接填寫：MySQL Docker 容器名稱（用 docker ps 查看）
+MYSQL_CONTAINER="1Panel-mysql-ikoc"
+
+# ✅ 直接填寫：MySQL 登入帳號
+MYSQL_USER="root"
+
+# ✅ 直接填寫：MySQL 登入密碼（替換為你的真實密碼）
+MYSQL_PASS="在這裡填入你的MySQL密碼"
+
+# ✅ 直接填寫：MySQL 資料庫名稱
+MYSQL_DB="gost"
+
+# ⚙️ 可選修改：SQLite 輸出路徑（預設 /tmp/gost.db，一般不需修改）
 SQLITE_DB="${1:-/tmp/gost.db}"
-# ================================================
+
+# ==========================================================
 
 TABLES="node tunnel forward user user_tunnel speed_limit statistics_flow vite_config"
 
@@ -166,16 +177,21 @@ for TABLE in $TABLES; do
     DUMP=$(docker exec "$MYSQL_CONTAINER" mysqldump -u"$MYSQL_USER" -p"$MYSQL_PASS" \
         --no-create-info --compact --compatible=ansi \
         --skip-extended-insert --complete-insert \
-        "$MYSQL_DB" "$TABLE" 2>/dev/null)
-
-    if [ $? -ne 0 ]; then
+        "$MYSQL_DB" "$TABLE" 2>&1)
+    
+    EXIT_CODE=$?
+    if [ $EXIT_CODE -ne 0 ]; then
+        # 過濾掉密碼警告，只看真正的錯誤
+        ERROR_MSG=$(echo "$DUMP" | grep -v "Warning.*password")
         echo "✗ 匯出失敗"
+        [ -n "$ERROR_MSG" ] && echo "    → $ERROR_MSG"
         FAIL=1
         continue
     fi
 
     # 清理 MySQL 專屬語法並匯入 SQLite
     echo "$DUMP" | \
+        grep -v "Warning.*password" | \
         sed 's/`/"/g' | \
         sed '/^\/\*/d' | \
         sed '/^--/d' | \
