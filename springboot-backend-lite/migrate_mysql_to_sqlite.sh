@@ -199,7 +199,7 @@ for TABLE in $TABLES; do
         sed '/^LOCK /d' | \
         sed '/^UNLOCK /d' | \
         sed '/^$/d' | \
-        sqlite3 "$SQLITE_DB" 2>/dev/null
+        sqlite3 "$SQLITE_DB" 2>>"${SQLITE_DB%.db}_import_errors.log"
 
     COUNT=$(sqlite3 "$SQLITE_DB" "SELECT COUNT(*) FROM \"$TABLE\";")
     echo "✓ $COUNT 條記錄"

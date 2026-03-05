@@ -31,6 +31,6 @@ VOLUME ["/app/data"]
 EXPOSE 6365
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
-    CMD curl -f http://localhost:6365/flow/test || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:6365/flow/test || exit 1
 
 ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar /app/app.jar"]

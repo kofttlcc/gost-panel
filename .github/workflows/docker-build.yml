@@ -367,6 +367,10 @@ jobs:
           
           echo "📤 上传 Docker Compose 配置文件..."
           gh release upload "${VERSION}" ./docker-compose-v4.yml --clobber
+          gh release upload "${VERSION}" ./docker-compose-lite.yml --clobber
+          
+          echo "📤 上传 SQLite 迁移脚本..."
+          gh release upload "${VERSION}" ./springboot-backend-lite/migrate_mysql_to_sqlite.sh --clobber
           
           echo "📤 上传数据库初始化文件..."
           gh release upload "${VERSION}" ./gost.sql --clobber
@@ -440,6 +444,11 @@ jobs:
           # 上传 Docker Compose 配置文件（覆盖）
           echo "📤 更新 Docker Compose 配置文件..."
           gh release upload "${VERSION}" ./docker-compose-v4.yml --clobber
+          gh release upload "${VERSION}" ./docker-compose-lite.yml --clobber
+
+          # 上传 SQLite 迁移脚本（覆盖）
+          echo "📤 更新 SQLite 迁移脚本..."
+          gh release upload "${VERSION}" ./springboot-backend-lite/migrate_mysql_to_sqlite.sh --clobber
           
           # 上传数据库初始化文件（覆盖）
           echo "📤 更新数据库初始化文件..."
