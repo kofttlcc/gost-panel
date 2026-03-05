@@ -10,6 +10,7 @@ import { Logo } from '@/components/icons';
 import { updatePassword } from '@/api';
 import { safeLogout } from '@/utils/logout';
 import { siteConfig } from '@/config/site';
+import { IOSPWAPrompt } from '@/components/IOSPWAPrompt';
 
 interface MenuItem {
   path: string;
@@ -467,6 +468,8 @@ export default function AdminLayout({
           )}
         </ModalContent>
       </Modal>
+
+      <IOSPWAPrompt />
     </div>
   );
 } 
