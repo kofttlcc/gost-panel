@@ -88,4 +88,13 @@ export const updateConfig = (name: string, value: string) => Network.post("/conf
 // 验证码相关接口
 export const checkCaptcha = () => Network.post("/captcha/check");
 export const generateCaptcha = () => Network.post(`/captcha/generate`);
-export const verifyCaptcha = (data: { captchaId: string; trackData: string }) => Network.post("/captcha/verify", data); 
+export const verifyCaptcha = (data: { captchaId: string; trackData: string }) => Network.post("/captcha/verify", data);
+
+// 延遲測試源 CRUD
+export const createDelaySource = (data: any) => Network.post("/delay_source/create", data);
+export const getDelaySourceList = () => Network.post("/delay_source/list");
+export const updateDelaySource = (data: any) => Network.post("/delay_source/update", data);
+export const deleteDelaySource = (id: number) => Network.post("/delay_source/delete", { id });
+
+// 延遲統計查詢
+export const getDelayStats = (params: { nodeId: number; sourceId?: number; hours?: number }) => Network.post("/node_delay/stats", params);
