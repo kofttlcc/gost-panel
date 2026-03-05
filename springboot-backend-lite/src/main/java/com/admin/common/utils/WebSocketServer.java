@@ -15,6 +15,9 @@ import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
+import com.alibaba.fastjson.JSONArray;
+import com.admin.entity.NodeDelayLog;
+import com.admin.service.INodeDelayLogService;
 
 import javax.annotation.Resource;
 import java.util.Objects;
@@ -31,6 +34,12 @@ public class WebSocketServer extends TextWebSocketHandler {
 
     @Resource
     NodeService nodeService;
+
+    @Resource
+    com.admin.service.IDelayTestSourceService delayTestSourceService;
+
+    @Resource
+    INodeDelayLogService nodeDelayLogService;
 
     // 存储所有活跃的 WebSocket 连接（
     private static final CopyOnWriteArraySet<WebSocketSession> activeSessions = new CopyOnWriteArraySet<>();
@@ -133,6 +142,31 @@ public class WebSocketServer extends TextWebSocketHandler {
                         }
                     } catch (Exception e) {
                         log.info("处理响应消息失败: {}", e.getMessage(), e);
+                    }
+                } else if (decryptedPayload.contains("\"type\":\"NodeDelayReport\"")) {
+                    log.info("收到节点延迟报告: {}", decryptedPayload);
+                    try {
+                        JSONObject reportJson = JSONObject.parseObject(decryptedPayload);
+                        JSONArray dataArray = reportJson.getJSONArray("data");
+                        if (dataArray != null && !dataArray.isEmpty()) {
+                            Long nodeId = Long.valueOf(id);
+                            long now = System.currentTimeMillis();
+                            for (int i = 0; i < dataArray.size(); i++) {
+                                JSONObject item = dataArray.getJSONObject(i);
+                                Long sourceId = item.getLong("sourceId");
+                                Integer delay = item.getInteger("delay");
+                                if (sourceId != null && delay != null) {
+                                    NodeDelayLog delayLog = new NodeDelayLog();
+                                    delayLog.setNodeId(nodeId);
+                                    delayLog.setSourceId(sourceId);
+                                    delayLog.setDelay(delay);
+                                    delayLog.setCreatedTime(now);
+                                    nodeDelayLogService.save(delayLog);
+                                }
+                            }
+                        }
+                    } catch (Exception e) {
+                        log.error("处理节点延迟报告失败: {}", e.getMessage(), e);
                     }
                 } else {
                     log.info("收到消息: {}", decryptedPayload);
@@ -302,6 +336,14 @@ public class WebSocketServer extends TextWebSocketHandler {
                         res.put("type", "status");
                         res.put("data", 1);
                         broadcastMessage(res.toJSONString());
+
+                        // Send delay test sources to the node upon connecting
+                        java.util.List<com.admin.entity.DelayTestSource> sources = delayTestSourceService.list();
+                        if (!sources.isEmpty()) {
+                            JSONObject config = new JSONObject();
+                            config.put("sources", sources);
+                            send_msg(nodeId, config, "SetDelayTestSources");
+                        }
                     } else {
                         log.info("节点 {} 状态更新失败", nodeId);
                     }

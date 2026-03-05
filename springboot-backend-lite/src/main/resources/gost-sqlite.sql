@@ -2,6 +2,29 @@
 -- 從 MySQL gost.sql 轉換而來
 
 -- 表結構：forward
+CREATE TABLE IF NOT EXISTS "delay_test_source" (
+  "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+  "name" TEXT NOT NULL,
+  "host" TEXT NOT NULL,
+  "protocol" TEXT NOT NULL DEFAULT 'tcp',
+  "port" INTEGER DEFAULT NULL,
+  "node_id" INTEGER DEFAULT NULL,
+  "created_time" INTEGER NOT NULL,
+  "updated_time" INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS "node_delay_log" (
+  "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+  "node_id" INTEGER NOT NULL,
+  "source_id" INTEGER NOT NULL,
+  "delay" INTEGER NOT NULL,  -- stores latency in milliseconds
+  "created_time" INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_node_delay_log_created_time ON "node_delay_log" ("created_time");
+CREATE INDEX IF NOT EXISTS idx_node_delay_log_node_id ON "node_delay_log" ("node_id");
+CREATE INDEX IF NOT EXISTS idx_node_delay_log_source_id ON "node_delay_log" ("source_id");
+
 CREATE TABLE IF NOT EXISTS "forward" (
   "id" INTEGER PRIMARY KEY AUTOINCREMENT,
   "user_id" INTEGER NOT NULL,
