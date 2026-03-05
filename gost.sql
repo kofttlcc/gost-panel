@@ -24,6 +24,40 @@ SET time_zone = "+00:00";
 -- --------------------------------------------------------
 
 --
+-- 表的结构 `delay_test_source`
+--
+
+CREATE TABLE `delay_test_source` (
+  `id` int(10) NOT NULL AUTO_INCREMENT,
+  `name` varchar(100) NOT NULL,
+  `host` varchar(200) NOT NULL,
+  `protocol` varchar(20) NOT NULL DEFAULT 'tcp',
+  `port` int(10) DEFAULT NULL,
+  `node_id` int(10) DEFAULT NULL,
+  `created_time` bigint(20) NOT NULL,
+  `updated_time` bigint(20) NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+--
+-- 表的结构 `node_delay_log`
+--
+
+CREATE TABLE `node_delay_log` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `node_id` int(10) NOT NULL,
+  `source_id` int(10) NOT NULL,
+  `delay` int(10) NOT NULL,
+  `created_time` bigint(20) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_created_time` (`created_time`),
+  KEY `idx_node_id` (`node_id`),
+  KEY `idx_source_id` (`source_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
 -- 表的结构 `forward`
 --
 

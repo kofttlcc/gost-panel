@@ -24,7 +24,7 @@ SQLITE_DB="${1:-/tmp/gost.db}"
 
 # ==========================================================
 
-TABLES="node tunnel forward user user_tunnel speed_limit statistics_flow vite_config"
+TABLES="node tunnel forward user user_tunnel speed_limit statistics_flow vite_config delay_test_source node_delay_log"
 
 # 檢查必要工具
 command -v docker >/dev/null 2>&1 || { echo "錯誤: 需要安裝 docker"; exit 1; }
@@ -50,6 +50,29 @@ echo ""
 echo "=== 步驟 1/3: 建立 SQLite 表結構 ==="
 
 sqlite3 "$SQLITE_DB" << 'SCHEMA_EOF'
+CREATE TABLE IF NOT EXISTS "delay_test_source" (
+  "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+  "name" TEXT NOT NULL,
+  "host" TEXT NOT NULL,
+  "protocol" TEXT NOT NULL DEFAULT 'tcp',
+  "port" INTEGER DEFAULT NULL,
+  "node_id" INTEGER DEFAULT NULL,
+  "created_time" INTEGER NOT NULL,
+  "updated_time" INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS "node_delay_log" (
+  "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+  "node_id" INTEGER NOT NULL,
+  "source_id" INTEGER NOT NULL,
+  "delay" INTEGER NOT NULL,
+  "created_time" INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_node_delay_log_created_time ON "node_delay_log" ("created_time");
+CREATE INDEX IF NOT EXISTS idx_node_delay_log_node_id ON "node_delay_log" ("node_id");
+CREATE INDEX IF NOT EXISTS idx_node_delay_log_source_id ON "node_delay_log" ("source_id");
+
 CREATE TABLE IF NOT EXISTS "forward" (
   "id" INTEGER PRIMARY KEY AUTOINCREMENT,
   "user_id" INTEGER NOT NULL,

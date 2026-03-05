@@ -1,6 +1,8 @@
 package com.admin.controller;
 
 import com.admin.service.*;
+import com.admin.service.IDelayTestSourceService;
+import com.admin.service.INodeDelayLogService;
 import org.springframework.beans.factory.annotation.Autowired;
 
 public class BaseController {
@@ -22,5 +24,11 @@ public class BaseController {
 
     @Autowired
     ViteConfigService viteConfigService;
+
+    @Autowired
+    IDelayTestSourceService delayTestSourceService;
+
+    @Autowired
+    INodeDelayLogService nodeDelayLogService;
 
 }

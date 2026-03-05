@@ -85,6 +85,21 @@ type TcpPingResponse struct {
 	RequestId    string  `json:"requestId,omitempty"`
 }
 
+// 延迟测试源配置
+type DelayTestSource struct {
+	ID       int64  `json:"id"`
+	Name     string `json:"name"`
+	Host     string `json:"host"`
+	Protocol string `json:"protocol"`
+	Port     int    `json:"port"`
+}
+
+// 节点延迟上报项
+type NodeDelayReportItem struct {
+	SourceId int64 `json:"sourceId"`
+	Delay    int   `json:"delay"`
+}
+
 type WebSocketReporter struct {
 	url            string
 	addr           string // 保存服务器地址
@@ -100,6 +115,8 @@ type WebSocketReporter struct {
 	connecting     bool              // 新增：正在连接状态
 	connMutex      sync.Mutex        // 新增：连接状态锁
 	aesCrypto      *crypto.AESCrypto // 新增：AES加密器
+	delayTestSources []DelayTestSource
+	delayTestMutex   sync.Mutex
 }
 
 // NewWebSocketReporter 创建一个新的WebSocket报告器
@@ -265,6 +282,9 @@ func (w *WebSocketReporter) handleConnection() {
 
 	// 启动消息接收goroutine
 	go w.receiveMessages()
+
+	// 启动延迟测试goroutine
+	go w.delayTestLoop()
 
 	// 主发送循环
 	ticker := time.NewTicker(w.pingInterval)
@@ -553,6 +573,10 @@ func (w *WebSocketReporter) routeCommand(cmd CommandMessage) {
 		err = w.handleSetProtocol(cmd.Data)
 		response.Type = "SetProtocolResponse"
 
+	case "SetDelayTestSources":
+		err = w.handleSetDelayTestSources(cmd.Data)
+		response.Type = "SetDelayTestSourcesResponse"
+
 	default:
 		err = fmt.Errorf("未知命令类型: %s", cmd.Type)
 		response.Type = "UnknownCommandResponse"
@@ -839,6 +863,149 @@ func (w *WebSocketReporter) handleSetProtocol(data interface{}) error {
 	// 同步写入本地 config.json
 	if err := updateLocalConfigJSON(httpVal, tlsVal, socksVal); err != nil {
 		return fmt.Errorf("写入config.json失败: %v", err)
+	}
+	return nil
+}
+
+// handleSetDelayTestSources 处理下发的延迟测试源配置
+func (w *WebSocketReporter) handleSetDelayTestSources(data interface{}) error {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("序列化延迟测试源配置失败: %v", err)
+	}
+
+	var req struct {
+		Sources []DelayTestSource `json:"sources"`
+	}
+	if err := json.Unmarshal(jsonData, &req); err != nil {
+		return fmt.Errorf("解析延迟测试源失败: %v", err)
+	}
+
+	w.delayTestMutex.Lock()
+	w.delayTestSources = req.Sources
+	w.delayTestMutex.Unlock()
+
+	fmt.Printf("✅ 更新延迟测试源配置，共 %d 个测试源\n", len(req.Sources))
+	return nil
+}
+
+// delayTestLoop 循环执行延迟测试并上报
+func (w *WebSocketReporter) delayTestLoop() {
+	ticker := time.NewTicker(60 * time.Second) // 每分钟执行一次
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-w.ctx.Done():
+			return
+		case <-ticker.C:
+			w.runDelayTests()
+		}
+	}
+}
+
+// runDelayTests 执行延迟测试并发送报告
+func (w *WebSocketReporter) runDelayTests() {
+	w.connMutex.Lock()
+	isConnected := w.connected
+	w.connMutex.Unlock()
+
+	if !isConnected {
+		return
+	}
+
+	w.delayTestMutex.Lock()
+	sources := make([]DelayTestSource, len(w.delayTestSources))
+	copy(sources, w.delayTestSources)
+	w.delayTestMutex.Unlock()
+
+	if len(sources) == 0 {
+		return
+	}
+
+	var reports []NodeDelayReportItem
+	for _, source := range sources {
+		if source.Protocol == "tcp" {
+			port := source.Port
+			if port <= 0 {
+				port = 80
+			}
+			avgTime, packetLoss, err := tcpPingHost(source.Host, port, 3, 2000)
+			delay := int(avgTime)
+			if err != nil || packetLoss == 100 {
+				delay = -1 // -1 means failed or unreachable
+			}
+			reports = append(reports, NodeDelayReportItem{
+				SourceId: source.ID,
+				Delay:    delay,
+			})
+		} else if source.Protocol == "icmp" {
+            // Placeholder for ICMP ping. Due to privileged requirements, ICMP is often tricky. 
+            // Gost panel originally used TCP ping for most tests. We could implement simple ICMP or fallback to TCP.
+            // Using tcpPingHost on port 80 as a fallback for ICMP.
+            avgTime, packetLoss, err := tcpPingHost(source.Host, 80, 3, 2000)
+			delay := int(avgTime)
+			if err != nil || packetLoss == 100 {
+				delay = -1
+			}
+			reports = append(reports, NodeDelayReportItem{
+				SourceId: source.ID,
+				Delay:    delay,
+			})
+        }
+	}
+
+	if len(reports) > 0 {
+		reportMessage := CommandMessage{
+			Type: "NodeDelayReport",
+			Data: reports,
+		}
+		if err := w.sendCommand(reportMessage); err != nil {
+			fmt.Printf("❌ 发送延迟测试报告失败: %v\n", err)
+		} else {
+			fmt.Printf("📊 已上报 %d 个延迟测试结果\n", len(reports))
+		}
+	}
+}
+
+// sendCommand 发送普通命令（如NodeDelayReport）给服务端
+func (w *WebSocketReporter) sendCommand(cmd CommandMessage) error {
+	w.connMutex.Lock()
+	defer w.connMutex.Unlock()
+
+	if w.conn == nil || !w.connected {
+		return fmt.Errorf("连接未建立")
+	}
+
+	jsonData, err := json.Marshal(cmd)
+	if err != nil {
+		return fmt.Errorf("序列化命令消息失败: %v", err)
+	}
+
+	var messageData []byte
+	if w.aesCrypto != nil {
+		encryptedData, err := w.aesCrypto.Encrypt(jsonData)
+		if err != nil {
+			messageData = jsonData
+		} else {
+			encryptedMessage := map[string]interface{}{
+				"encrypted": true,
+				"data":      encryptedData,
+				"timestamp": time.Now().Unix(),
+			}
+			messageData, err = json.Marshal(encryptedMessage)
+			if err != nil {
+				messageData = jsonData
+			}
+		}
+	} else {
+		messageData = jsonData
+	}
+
+	w.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+	if err := w.conn.WriteMessage(websocket.TextMessage, messageData); err != nil {
+		w.connected = false
+		return fmt.Errorf("写入消息失败: %v", err)
 	}
 	return nil
 }
