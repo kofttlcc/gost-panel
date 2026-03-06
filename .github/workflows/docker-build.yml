@@ -163,7 +163,7 @@ jobs:
 
   build-java-lite:
     name: Build & Push Spring Boot Backend (SQLite Lite)
-    needs: [check-version, build-vite]
+    needs: check-version
     if: needs.check-version.outputs.should_build == 'true'
     runs-on: ubuntu-latest
     steps:
