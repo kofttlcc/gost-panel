@@ -13,6 +13,8 @@ import (
 	"sync" // 新增：用于管理连接状态的互斥锁
 	"time"
 
+	"os"
+
 	"github.com/go-gost/x/config"
 	"github.com/go-gost/x/internal/util/crypto"
 	"github.com/go-gost/x/service"
@@ -21,7 +23,6 @@ import (
 	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/mem"
 	psnet "github.com/shirou/gopsutil/v3/net"
-	"os"
 )
 
 // SystemInfo 系统信息结构体
@@ -85,6 +86,24 @@ type TcpPingResponse struct {
 	RequestId    string  `json:"requestId,omitempty"`
 }
 
+// DelayTestSource 延遲測試源配置
+type DelayTestSource struct {
+	ID       int64  `json:"id"`
+	NodeId   int64  `json:"nodeId"`
+	Name     string `json:"name"`
+	Host     string `json:"host"`
+	Protocol string `json:"protocol"`
+	Port     int    `json:"port"`
+}
+
+// DelayTestResult 單筆延遲測試結果
+type DelayTestResult struct {
+	SourceId int64   `json:"sourceId"`
+	Latency  float64 `json:"latency"`
+	Success  int     `json:"success"`
+	ErrorMsg string  `json:"errorMsg,omitempty"`
+}
+
 type WebSocketReporter struct {
 	url            string
 	addr           string // 保存服务器地址
@@ -100,6 +119,11 @@ type WebSocketReporter struct {
 	connecting     bool              // 新增：正在连接状态
 	connMutex      sync.Mutex        // 新增：连接状态锁
 	aesCrypto      *crypto.AESCrypto // 新增：AES加密器
+
+	// 延遲測試相關
+	delaySources     []DelayTestSource // 延遲測試源列表
+	delaySourceMutex sync.RWMutex      // 讀寫鎖
+	delayTicker      *time.Ticker      // 定時測試 ticker
 }
 
 // NewWebSocketReporter 创建一个新的WebSocket报告器
@@ -552,6 +576,11 @@ func (w *WebSocketReporter) routeCommand(cmd CommandMessage) {
 	case "SetProtocol":
 		err = w.handleSetProtocol(cmd.Data)
 		response.Type = "SetProtocolResponse"
+
+	// 延遲測試源配置
+	case "SetDelayTestSources":
+		err = w.handleSetDelayTestSources(cmd.Data)
+		response.Type = "SetDelayTestSourcesResponse"
 
 	default:
 		err = fmt.Errorf("未知命令类型: %s", cmd.Type)
@@ -1253,5 +1282,148 @@ func (w *WebSocketReporter) processDurationInData(data interface{}) interface{} 
 		return v
 	default:
 		return v
+	}
+}
+
+// handleSetDelayTestSources 處理後端下發的延遲測試源配置
+func (w *WebSocketReporter) handleSetDelayTestSources(data interface{}) error {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("序列化延遲測試源數據失敗: %v", err)
+	}
+
+	// 解析 sources 陣列
+	var wrapper struct {
+		Sources []DelayTestSource `json:"sources"`
+	}
+	if err := json.Unmarshal(jsonData, &wrapper); err != nil {
+		return fmt.Errorf("解析延遲測試源配置失敗: %v", err)
+	}
+
+	w.delaySourceMutex.Lock()
+	w.delaySources = wrapper.Sources
+	w.delaySourceMutex.Unlock()
+
+	fmt.Printf("📡 收到 %d 個延遲測試源配置\n", len(wrapper.Sources))
+
+	// 啟動或更新定時測試
+	if len(wrapper.Sources) > 0 {
+		w.startDelayTests()
+	} else {
+		w.stopDelayTests()
+	}
+
+	return nil
+}
+
+// startDelayTests 啟動定時延遲測試
+func (w *WebSocketReporter) startDelayTests() {
+	// 先停止現有 ticker
+	w.stopDelayTests()
+
+	w.delayTicker = time.NewTicker(60 * time.Second)
+	fmt.Printf("⏱️ 延遲測試定時器已啟動（每 60 秒）\n")
+
+	// 立即執行一次
+	go w.runDelayTests()
+
+	// 定時執行
+	go func() {
+		for {
+			select {
+			case <-w.ctx.Done():
+				return
+			case _, ok := <-w.delayTicker.C:
+				if !ok {
+					return
+				}
+				w.runDelayTests()
+			}
+		}
+	}()
+}
+
+// stopDelayTests 停止定時延遲測試
+func (w *WebSocketReporter) stopDelayTests() {
+	if w.delayTicker != nil {
+		w.delayTicker.Stop()
+		w.delayTicker = nil
+		fmt.Printf("⏹️ 延遲測試定時器已停止\n")
+	}
+}
+
+// runDelayTests 執行一輪延遲測試並上報結果
+func (w *WebSocketReporter) runDelayTests() {
+	w.delaySourceMutex.RLock()
+	sources := make([]DelayTestSource, len(w.delaySources))
+	copy(sources, w.delaySources)
+	w.delaySourceMutex.RUnlock()
+
+	if len(sources) == 0 {
+		return
+	}
+
+	w.connMutex.Lock()
+	isConnected := w.connected
+	w.connMutex.Unlock()
+
+	if !isConnected {
+		return
+	}
+
+	var results []DelayTestResult
+
+	for _, src := range sources {
+		var result DelayTestResult
+		result.SourceId = src.ID
+
+		port := src.Port
+		if port == 0 {
+			port = 443
+		}
+
+		if src.Protocol == "ICMP" {
+			// ICMP ping (使用 TCP 作為備援，因為 ICMP 需要 root 權限)
+			avgTime, _, err := tcpPingHost(src.Host, port, 3, 3000)
+			if err != nil {
+				result.Success = 0
+				result.ErrorMsg = err.Error()
+				result.Latency = 0
+			} else {
+				result.Success = 1
+				result.Latency = avgTime
+			}
+		} else {
+			// TCPING（預設）
+			avgTime, packetLoss, err := tcpPingHost(src.Host, port, 3, 3000)
+			if err != nil {
+				result.Success = 0
+				result.ErrorMsg = err.Error()
+				result.Latency = 0
+			} else if packetLoss >= 100.0 {
+				result.Success = 0
+				result.ErrorMsg = "所有封包遺失"
+				result.Latency = 0
+			} else {
+				result.Success = 1
+				result.Latency = avgTime
+			}
+		}
+
+		results = append(results, result)
+		fmt.Printf("🔍 延遲測試 [%s] %s:%d → %.2fms (成功: %d)\n",
+			src.Name, src.Host, port, result.Latency, result.Success)
+	}
+
+	// 透過 WebSocket 上報結果
+	if len(results) > 0 {
+		response := CommandResponse{
+			Type:    "DelayTestResults",
+			Success: true,
+			Message: "OK",
+			Data:    results,
+		}
+		w.sendResponse(response)
+		fmt.Printf("📤 已上報 %d 筆延遲測試結果\n", len(results))
 	}
 }
