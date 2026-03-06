@@ -83,7 +83,7 @@ export default function H5Layout({
       // 补充设置admin字段，避免下次再次判断
       localStorage.setItem('admin', adminFlag.toString());
     }
-    
+
 
     setIsAdmin(adminFlag);
   }, []);
@@ -94,7 +94,7 @@ export default function H5Layout({
   };
 
   // 过滤tab项（根据权限）
-  const filteredTabItems = tabItems.filter(item => 
+  const filteredTabItems = tabItems.filter(item =>
     !item.adminOnly || isAdmin
   );
 
@@ -131,29 +131,33 @@ export default function H5Layout({
       <div aria-hidden className="h-16 safe-bottom" />
 
       {/* 底部Tabbar */}
-      <nav className="bg-white dark:bg-black border-t border-gray-200 dark:border-gray-600 h-16 safe-bottom flex-shrink-0 flex items-center justify-around px-2 fixed bottom-0 left-0 right-0 z-30">
-        {filteredTabItems.map((item) => {
-          const isActive = location.pathname === item.path;
-          return (
-            <button
-              key={item.path}
-              onClick={() => handleTabClick(item.path)}
-              className={`
-                flex flex-col items-center justify-center flex-1 h-full
-                transition-colors duration-200 min-h-[44px]
-                ${isActive 
-                  ? 'text-primary-600 dark:text-primary-400' 
-                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                }
-              `}
-            >
-              <div className="flex-shrink-0 mb-1">
-                {item.icon}
-              </div>
-              <span className="text-xs font-medium">{item.label}</span>
-            </button>
-          );
-        })}
+      <nav className="fixed bottom-0 left-0 right-0 z-30 bg-white dark:bg-black border-t border-gray-200 dark:border-gray-600">
+        <div className="flex items-center justify-around px-2 h-14">
+          {filteredTabItems.map((item) => {
+            const isActive = location.pathname === item.path;
+            return (
+              <button
+                key={item.path}
+                onClick={() => handleTabClick(item.path)}
+                className={`
+                  flex flex-col items-center justify-center flex-1 h-full
+                  transition-colors duration-200 min-h-[44px]
+                  ${isActive
+                    ? 'text-primary-600 dark:text-primary-400'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                  }
+                `}
+              >
+                <div className="flex-shrink-0 mb-0.5">
+                  {item.icon}
+                </div>
+                <span className="text-xs font-medium">{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+        {/* iOS safe area 底部留白放在按鈕下方 */}
+        <div className="safe-bottom" />
       </nav>
 
     </div>
