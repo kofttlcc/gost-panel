@@ -195,6 +195,38 @@ CREATE TABLE `vite_config` (
 INSERT INTO `vite_config` (`id`, `name`, `value`, `time`) VALUES
 (1, 'app_name', 'flux', 1755147963000);
 
+-- --------------------------------------------------------
+
+--
+-- 表的结构 `delay_test_source`
+--
+
+CREATE TABLE `delay_test_source` (
+  `id` int(10) NOT NULL,
+  `name` varchar(255) NOT NULL,
+  `host` varchar(255) NOT NULL,
+  `protocol` varchar(50) NOT NULL,
+  `port` int(10) DEFAULT NULL,
+  `node_id` varchar(50) DEFAULT NULL,
+  `created_time` bigint(20) NOT NULL,
+  `updated_time` bigint(20) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- 表的结构 `node_delay_log`
+--
+
+CREATE TABLE `node_delay_log` (
+  `id` int(10) NOT NULL,
+  `node_id` varchar(50) NOT NULL,
+  `source_id` int(10) NOT NULL,
+  `delay_ms` int(10) NOT NULL,
+  `status` varchar(50) NOT NULL,
+  `created_time` bigint(20) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 --
 -- 转储表的索引
 --
@@ -249,6 +281,22 @@ ALTER TABLE `vite_config`
   ADD UNIQUE KEY `name` (`name`);
 
 --
+-- 表的索引 `delay_test_source`
+--
+ALTER TABLE `delay_test_source`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_name` (`name`);
+
+--
+-- 表的索引 `node_delay_log`
+--
+ALTER TABLE `node_delay_log`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_node_id` (`node_id`),
+  ADD KEY `idx_source_id` (`source_id`),
+  ADD KEY `idx_created_time` (`created_time`);
+
+--
 -- 在导出的表使用AUTO_INCREMENT
 --
 
@@ -299,6 +347,19 @@ ALTER TABLE `user_tunnel`
 --
 ALTER TABLE `vite_config`
   MODIFY `id` int(10) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
+
+--
+-- 使用表AUTO_INCREMENT `delay_test_source`
+--
+ALTER TABLE `delay_test_source`
+  MODIFY `id` int(10) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
+
+--
+-- 使用表AUTO_INCREMENT `node_delay_log`
+--
+ALTER TABLE `node_delay_log`
+  MODIFY `id` int(10) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
+
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

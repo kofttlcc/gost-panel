@@ -36,6 +36,9 @@ public class CheckGostConfigAsync {
     @Lazy
     private TunnelService tunnelService;
 
+    @Resource
+    @Lazy
+    private IDelayTestSourceService delayTestSourceService;
 
 
     /**
@@ -49,6 +52,7 @@ public class CheckGostConfigAsync {
             cleanOrphanedServices(gostConfig, node);
             cleanOrphanedChains(gostConfig, node);
             cleanOrphanedLimiters(gostConfig, node);
+            syncDelayTestSources(node);
         }
     }
 
@@ -193,6 +197,28 @@ public class CheckGostConfigAsync {
                 }
             }
         }, "同步限流器 ");
+    }
+
+    /**
+     * 同步延遲測試源
+     */
+    private void syncDelayTestSources(Node node) {
+        safeExecute(() -> {
+            List<DelayTestSource> allSources = delayTestSourceService.list();
+            List<DelayTestSource> nodeSources = new ArrayList<>();
+            for (DelayTestSource source : allSources) {
+                // 如果沒有指定 nodeId，或 nodeId 為 0 代表全域；或是指定了匹配的 nodeId，則下發給這個節點
+                if (source.getNodeId() == null || source.getNodeId() == 0L || source.getNodeId().equals(node.getId())) {
+                    nodeSources.add(source);
+                }
+            }
+            
+            JSONObject config = new JSONObject();
+            config.put("sources", nodeSources);
+            
+            // 透過 WebSocket 發送給該節點
+            com.admin.common.utils.WebSocketServer.send_msg(node.getId(), config, "SetDelayTestSources");
+        }, "同步延遲測試源 ");
     }
 
     /**

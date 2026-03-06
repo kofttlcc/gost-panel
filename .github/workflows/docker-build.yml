@@ -302,6 +302,19 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      - name: Set up Node.js for Frontend
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build Frontend Static Files
+        working-directory: ./vite-frontend
+        run: |
+          npm install --legacy-peer-deps
+          npm run build
+          mkdir -p ../artifacts
+          tar -czf ../artifacts/frontend.tar.gz -C dist .
+
       - name: Download GOST AMD64 binary
         uses: actions/download-artifact@v4
         with:
@@ -357,6 +370,9 @@ jobs:
           fi
           
           # 上传所有文件到 release
+          echo "📤 上传前端静态文件..."
+          gh release upload "${VERSION}" ./artifacts/frontend.tar.gz --clobber
+          
           echo "📤 上传 GOST 二进制文件..."
           gh release upload "${VERSION}" ./artifacts/gost-amd64 --clobber
           gh release upload "${VERSION}" ./artifacts/gost-arm64 --clobber
@@ -364,6 +380,7 @@ jobs:
           echo "📤 上传安装脚本..."
           gh release upload "${VERSION}" ./install.sh --clobber
           gh release upload "${VERSION}" ./panel_install.sh --clobber
+          gh release upload "${VERSION}" ./upgrade_lite.sh --clobber
           
           echo "📤 上传 Docker Compose 配置文件..."
           gh release upload "${VERSION}" ./docker-compose-v4.yml --clobber
@@ -440,6 +457,7 @@ jobs:
           echo "📤 更新安装脚本..."
           gh release upload "${VERSION}" ./install.sh --clobber
           gh release upload "${VERSION}" ./panel_install.sh --clobber
+          gh release upload "${VERSION}" ./upgrade_lite.sh --clobber
           
           # 上传 Docker Compose 配置文件（覆盖）
           echo "📤 更新 Docker Compose 配置文件..."

@@ -128,3 +128,30 @@ CREATE TABLE IF NOT EXISTS "vite_config" (
 -- 預設配置
 INSERT OR IGNORE INTO "vite_config" ("id", "name", "value", "time")
 VALUES (1, 'app_name', 'flux', 1755147963000);
+
+-- 表結構：delay_test_source（延遲測試源）
+CREATE TABLE IF NOT EXISTS "delay_test_source" (
+  "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+  "node_id" INTEGER DEFAULT 0,
+  "name" TEXT NOT NULL,
+  "host" TEXT NOT NULL,
+  "protocol" TEXT NOT NULL DEFAULT 'TCPING',
+  "port" INTEGER NOT NULL DEFAULT 443,
+  "created_time" INTEGER NOT NULL,
+  "updated_time" INTEGER DEFAULT NULL
+);
+
+-- 表結構：node_delay_log（節點延遲測試日誌）
+CREATE TABLE IF NOT EXISTS "node_delay_log" (
+  "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+  "node_id" INTEGER NOT NULL,
+  "source_id" INTEGER NOT NULL,
+  "latency" REAL NOT NULL DEFAULT 0,
+  "success" INTEGER NOT NULL DEFAULT 0,
+  "error_msg" TEXT DEFAULT NULL,
+  "created_time" INTEGER NOT NULL
+);
+
+-- 為延遲日誌建立索引以加速查詢
+CREATE INDEX IF NOT EXISTS "idx_delay_log_node_time" ON "node_delay_log" ("node_id", "created_time");
+CREATE INDEX IF NOT EXISTS "idx_delay_log_source" ON "node_delay_log" ("source_id");

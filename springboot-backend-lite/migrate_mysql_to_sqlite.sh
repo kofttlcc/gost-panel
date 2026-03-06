@@ -161,6 +161,31 @@ CREATE TABLE IF NOT EXISTS "vite_config" (
   "value" TEXT NOT NULL,
   "time" INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS "delay_test_source" (
+  "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+  "name" TEXT NOT NULL,
+  "host" TEXT NOT NULL,
+  "protocol" TEXT NOT NULL,
+  "port" INTEGER DEFAULT NULL,
+  "node_id" TEXT DEFAULT NULL,
+  "created_time" INTEGER NOT NULL,
+  "updated_time" INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS "node_delay_log" (
+  "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+  "node_id" TEXT NOT NULL,
+  "source_id" INTEGER NOT NULL,
+  "delay_ms" INTEGER NOT NULL,
+  "status" TEXT NOT NULL,
+  "created_time" INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS "idx_delay_test_source_name" ON "delay_test_source"("name");
+CREATE INDEX IF NOT EXISTS "idx_node_delay_log_node_id" ON "node_delay_log"("node_id");
+CREATE INDEX IF NOT EXISTS "idx_node_delay_log_source_id" ON "node_delay_log"("source_id");
+CREATE INDEX IF NOT EXISTS "idx_node_delay_log_created_time" ON "node_delay_log"("created_time");
 SCHEMA_EOF
 
 echo "  ✓ 表結構建立完成"

@@ -23,4 +23,10 @@ public class BaseController {
     @Autowired
     ViteConfigService viteConfigService;
 
+    @Autowired
+    IDelayTestSourceService delayTestSourceService;
+
+    @Autowired
+    INodeDelayLogService nodeDelayLogService;
+
 }
