@@ -1,28 +1,23 @@
-# 構建階段 - 使用與原 Dockerfile 相同的 Maven 編譯映像
-FROM maven:3.9.6-eclipse-temurin-21 AS build
+# 構建階段 - Maven 編譯
+FROM maven:3.9.6-eclipse-temurin-21-alpine AS build
 WORKDIR /app
 COPY pom.xml .
 COPY src ./src
 RUN mvn clean package -DskipTests
 
-# 運行階段 - 使用 IBM Semeru (OpenJ9) 極限壓縮
-FROM ibm-semeru-runtimes:open-21-jre-jammy
+# 運行階段 - 使用 Eclipse Temurin JRE (輕量 Alpine)
+FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
 # 建立 SQLite 資料目錄
 RUN mkdir -p /app/data
 
-# OpenJ9 專屬記憶體壓縮參數
-ENV JAVA_OPTS="-Xmx128m -Xms64m -Xmso256k -Xscmx64m -Xshareclasses -Xtune:virtualized -Xjit:optlevel=cold -Xgcpolicy:gencon -XX:MaxDirectMemorySize=32m -Dfile.encoding=UTF-8 -Duser.timezone=Asia/Shanghai"
+# JVM 記憶體優化參數
+ENV JAVA_OPTS="-Xmx128m -Xms64m -XX:MaxDirectMemorySize=32m -XX:+UseSerialGC -XX:MaxMetaspaceSize=96m -Dfile.encoding=UTF-8 -Duser.timezone=Asia/Shanghai"
 ENV LANG=en_US.UTF-8
-ENV LANGUAGE=en_US:en
-ENV LC_ALL=en_US.UTF-8
-ENV MALLOC_ARENA_MAX=1
 
-# 安裝字體依賴
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    fontconfig fonts-dejavu-core \
-    && rm -rf /var/lib/apt/lists/*
+# 安裝字體依賴（Alpine 用 apk）
+RUN apk add --no-cache fontconfig ttf-dejavu
 
 COPY --from=build /app/target/*.jar app.jar
 
