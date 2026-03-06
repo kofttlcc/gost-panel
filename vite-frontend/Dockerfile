@@ -1,5 +1,5 @@
 # 多阶段构建 - 构建阶段
-FROM node:20.19.0 AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -10,7 +10,7 @@ COPY . .
 RUN npm run build
 
 # 生产阶段
-FROM nginx:stable-alpine AS production-stage
+FROM nginx:alpine AS production-stage
 
 RUN apk update && apk upgrade
 
